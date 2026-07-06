@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="UrbanFlow OSM - Plataforma de movilidad urbana inteligente" />
+  <title>UrbanFlow OSM · Movilidad urbana</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <!-- Topbar mejorada -->
+  <nav class="topbar">
+    <div class="topbar-left">
+      <div class="brand">🗺️ <span class="brand-name">UrbanFlow</span> <span class="brand-sub">OSM</span></div>
+      <div class="subtitle">Movilidad Urbana Inteligente</div>
+    </div>
+    <div class="topbar-center">
+      <div class="tabs-container">
+        <button class="tab active" data-view="usuario" title="Vista de usuario">
+          <span class="tab-icon">🧭</span>
+          <span class="tab-label">Usuario</span>
+        </button>
+        <button class="tab" data-view="admin" title="Panel de administración">
+          <span class="tab-icon">⚙️</span>
+          <span class="tab-label">Admin</span>
+        </button>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div id="ml-badge" class="badge">
+        <span class="badge-dot"></span>
+        <span id="ml-text">ML: cargando…</span>
+      </div>
+      <div id="status-dot" class="status-indicator" title="Estado del servidor"></div>
+    </div>
+  </nav>
+
+  <!-- VISTA USUARIO ====================================== -->
+  <main id="view-usuario" class="view active">
+    <div class="map-wrapper">
+      <div id="map" class="map"></div>
+      
+      <!-- Controles del mapa flotantes -->
+      <div class="map-controls">
+        <button id="btn-locate" class="map-control-btn" title="Centrar en mi ubicación">
+          <span>📍</span>
+        </button>
+        <button id="btn-traffic-toggle" class="map-control-btn" title="Alternar tráfico">
+          <span>🚦</span>
+        </button>
+      </div>
+    </div>
+
+    <aside class="sidebar">
+      <div class="sidebar-scroll">
+        <!-- Sección de búsqueda -->
+        <section class="section">
+          <h2 class="section-title">Planifica tu viaje</h2>
+          
+          <div class="search-box">
+            <div class="search-field">
+              <span class="search-dot origin">●</span>
+              <input 
+                id="origen" 
+                type="text" 
+                placeholder="¿De dónde salimos?" 
+                autocomplete="off"
+                class="search-input"
+              />
+              <button class="search-clear" id="btn-clear-origen" hidden>✕</button>
+            </div>
+            <ul id="sug-origen" class="suggestions"></ul>
+
+            <button id="btn-swap" class="btn-swap" title="Intercambiar origen y destino">
+              ⇅
+            </button>
+
+            <div class="search-field">
+              <span class="search-dot destination">●</span>
+              <input 
+                id="destino" 
+                type="text" 
+                placeholder="¿A dónde vamos?" 
+                autocomplete="off"
+                class="search-input"
+              />
+              <button class="search-clear" id="btn-clear-destino" hidden>✕</button>
+            </div>
+            <ul id="sug-destino" class="suggestions"></ul>
+          </div>
+
+          <!-- Botón de ubicación actual -->
+          <button id="btn-gps" class="btn-gps">📍 Usar mi ubicación</button>
+        </section>
+
+        <!-- Selector de modos -->
+        <section class="section">
+          <h3 class="section-label">Modo de transporte</h3>
+          <div class="modes" id="modos">
+            <button class="mode active" data-modo="auto" title="Automóvil">
+              <span class="mode-icon">🚗</span>
+              <span class="mode-text">Auto</span>
+            </button>
+            <button class="mode" data-modo="bus" title="Autobús">
+              <span class="mode-icon">🚌</span>
+              <span class="mode-text">Bus</span>
+            </button>
+            <button class="mode" data-modo="moto" title="Motocicleta">
+              <span class="mode-icon">🏍️</span>
+              <span class="mode-text">Moto</span>
+            </button>
+            <button class="mode" data-modo="bici" title="Bicicleta">
+              <span class="mode-icon">🚲</span>
+              <span class="mode-text">Bici</span>
+            </button>
+            <button class="mode" data-modo="pie" title="A pie">
+              <span class="mode-icon">🚶</span>
+              <span class="mode-text">Pie</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="section">
+          <h3 class="section-label">Simulador de trafico</h3>
+          <div class="traffic-sim" id="traffic-sim">
+            <button class="traffic-chip active" data-escenario="real">Real</button>
+            <button class="traffic-chip" data-escenario="bueno">Bueno</button>
+            <button class="traffic-chip" data-escenario="regular">Regular</button>
+            <button class="traffic-chip" data-escenario="malo">Malo</button>
+          </div>
+        </section>
+
+        <!-- Botón de calcular ruta -->
+        <button id="btn-ruta" class="btn-primary btn-lg">
+          <span>🗺️</span> Calcular ruta
+        </button>
+
+        <!-- Indicador de carga -->
+        <div id="loader" class="loader hidden">
+          <div class="spinner"></div>
+          <p>Calculando ruta…</p>
+        </div>
+
+        <!-- Resultado de ruta -->
+        <section id="resultado-block" class="section result-section hidden">
+          <div class="result-header">
+            <h3 id="resumen-ruta" class="result-title"></h3>
+            <button class="btn-collapse" id="btn-collapse-result">▼</button>
+          </div>
+          <div class="result-content">
+            <div id="pasos" class="pasos"></div>
+            <div class="result-actions">
+              <button id="btn-tts" class="btn-secondary" hidden>
+                <span>🎧</span> Escuchar
+              </button>
+              <button id="btn-save-route" class="btn-secondary">
+                <span>💾</span> Guardar ruta
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Información de tráfico -->
+        <section id="traffic-info" class="section info-section hidden">
+          <h3 class="section-label">🚦 Tráfico</h3>
+          <div id="traffic-summary" class="info-content"></div>
+        </section>
+
+        <!-- Búsqueda de POI (SerpAPI) -->
+        <section class="section">
+          <h3 class="section-label">🔍 Buscar lugares</h3>
+          <div class="poi-search">
+            <input 
+              id="poi-query" 
+              type="text" 
+              placeholder="ej: Coffee, Restaurant, Hospital"
+              class="search-input"
+            />
+            <button id="btn-poi-search" class="btn-primary btn-sm">
+              <span>🔍</span> Buscar
+            </button>
+          </div>
+          <div id="poi-status" class="poi-status hidden"></div>
+          <div id="poi-results" class="poi-results hidden"></div>
+        </section>
+      </div>
+
+      <!-- Footer del sidebar -->
+      <footer class="sidebar-footer">
+        <div class="footer-text">Datos: OpenStreetMap · OSRM · Nominatim · Overpass</div>
+        <div class="footer-version">v2.0 mejorado</div>
+      </footer>
+    </aside>
+
+      <!-- Floating instructions panel -->
+    <div id="fullscreen-steps" class="hidden">
+      <div class="fs-inner">
+        <div class="fs-header">
+          <h2>Indicaciones</h2>
+          <button id="fs-btn-tts" class="fs-btn-tts" title="Escuchar indicaciones" hidden>
+            🎧
+          </button>
+          <button class="btn-icon" onclick="window.UF.user.closeFullScreenInstructions()">✖</button>
+        </div>
+        <div class="fs-content" id="fs-content"></div>
+      </div>
+    </div>
+
+    <!-- Toast de notificaciones -->
+    <div id="toast" class="toast"></div>
+  </main>
+
+  <!-- VISTA ADMIN ====================================== -->
+  <section id="view-admin" class="view admin-view">
+    <div class="admin-header">
+      <h1>Panel de Administración</h1>
+      <div class="admin-status">
+        <span id="admin-status-text">Estado: conectando…</span>
+        <div id="admin-status-dot" class="status-dot"></div>
+      </div>
+    </div>
+
+    <div class="admin-grid">
+      <!-- Tarjeta: Estado del sistema -->
+      <div class="admin-card">
+        <div class="card-header">
+          <h3>📊 Estado del sistema</h3>
+          <button id="btn-health" class="btn-icon" title="Refrescar">🔄</button>
+        </div>
+        <div id="health" class="kv-list"></div>
+        <div class="card-footer">
+          <small id="health-updated">Última actualización: nunca</small>
+        </div>
+      </div>
+
+      <!-- Tarjeta: Autenticación -->
+      <div class="admin-card">
+        <div class="card-header">
+          <h3>🔐 Autenticación admin</h3>
+        </div>
+        <div class="input-group">
+          <input 
+            id="admin-key" 
+            type="password" 
+            placeholder="X-API-Key de administrador"
+            class="admin-input"
+          />
+          <button id="btn-toggle-key" class="btn-icon" title="Mostrar/ocultar">👁️</button>
+        </div>
+        <button id="btn-save-key" class="btn-primary">Guardar clave</button>
+        <div id="auth-status" class="auth-status"></div>
+        <small class="hint">La clave admin se imprime en consola del servidor.</small>
+      </div>
+
+      <!-- Tarjeta: Machine Learning -->
+      <div class="admin-card">
+        <div class="card-header">
+          <h3>🤖 Machine Learning</h3>
+          <span id="ml-status" class="badge-mini">No entrenado</span>
+        </div>
+        <div class="button-group">
+          <button id="btn-train" class="btn-primary">Entrenar modelo</button>
+          <button id="btn-view-metrics" class="btn-secondary">Ver métricas</button>
+        </div>
+        <div id="ml-metrics" class="metrics-box hidden"></div>
+        <hr class="divider" />
+        <h4>Predicción rápida</h4>
+        <div class="input-group-inline">
+          <input id="p-dist" type="number" placeholder="km" min="0" step="0.1" />
+          <input id="p-base" type="number" placeholder="min base" min="0" step="0.1" />
+          <select id="p-traf">
+            <option value="1">Tráfico bajo</option>
+            <option value="2" selected>Tráfico medio</option>
+            <option value="3">Tráfico alto</option>
+          </select>
+        </div>
+        <button id="btn-predict" class="btn-secondary">Predecir</button>
+        <div id="ml-pred" class="prediction-result hidden"></div>
+      </div>
+
+      <!-- Tarjeta: Importar datos -->
+      <div class="admin-card">
+        <div class="card-header">
+          <h3>📥 Importar datos</h3>
+        </div>
+        <div class="import-section">
+          <h4>Datos ML de trafico (solo CSV)</h4>
+          <div class="file-input-wrapper">
+            <input id="csv-file" type="file" accept=".csv" />
+            <label for="csv-file" class="btn-secondary">Seleccionar CSV de trafico</label>
+          </div>
+          <small class="hint">No subas aqui el Excel de rutas. Esta seccion es solo para historico/ML.</small>
+          <button id="btn-upload" class="btn-primary">Subir y procesar</button>
+        </div>
+        <hr class="divider" />
+        <div class="import-section">
+          <h4>Feed GTFS</h4>
+          <input id="gtfs-url" type="text" placeholder="https://…/gtfs.zip" class="admin-input" />
+          <button id="btn-gtfs" class="btn-primary">Importar GTFS</button>
+        </div>
+        <hr class="divider" />
+        <div class="import-section">
+          <h4>Excel de rutas de transporte publico</h4>
+          <div class="file-input-wrapper">
+            <input id="matrix-file" type="file" accept=".csv,.xls,.xlsx,.html" />
+            <label for="matrix-file" class="btn-secondary">Seleccionar Excel de rutas</label>
+          </div>
+          <small id="matrix-file-name" class="hint">Puedes subir el Excel descargado y editado: .xlsx, .xls o CSV.</small>
+          <label class="check-row">
+            <input id="matrix-replace" type="checkbox" />
+            Reemplazar rutas cargadas
+          </label>
+          <div class="button-group">
+            <button id="btn-matrix-upload" class="btn-primary">Subir Excel de rutas</button>
+            <button id="btn-matrix-template" class="btn-secondary">Ver plantilla</button>
+          </div>
+          <div class="button-group">
+            <button id="btn-osm-import" class="btn-secondary">Buscar rutas OSM Ecuador</button>
+            <button id="btn-matrix-refresh" class="btn-secondary">Ver rutas cargadas Excel</button>
+          </div>
+          <div id="matrix-summary" class="matrix-summary hidden"></div>
+          <pre id="matrix-template" class="mini-template hidden"></pre>
+        </div>
+        <hr class="divider" />
+        <div class="import-section manual-route-section">
+          <h4>Carga manual de ruta</h4>
+          <div class="input-group-inline">
+            <input id="manual-city" class="admin-input" type="text" placeholder="Ciudad" value="Quito" />
+            <input id="manual-operator" class="admin-input" type="text" placeholder="Cooperativa" />
+            <input id="manual-line" class="admin-input" type="text" placeholder="Linea" />
+          </div>
+          <input id="manual-route-name" class="admin-input" type="text" placeholder="Nombre de ruta, ej: Carcelen - Marin" />
+          <div class="input-group-inline">
+            <select id="manual-direction" class="admin-input">
+              <option value="ida">ida</option>
+              <option value="retorno">retorno</option>
+            </select>
+            <input id="manual-interval" class="admin-input" type="number" min="0" placeholder="Intervalo min" />
+            <input id="manual-fleet" class="admin-input" type="number" min="0" placeholder="Flota" />
+          </div>
+          <div class="input-group-inline">
+            <input id="manual-schedule" class="admin-input" type="text" placeholder="Horario, ej: 05:30 a 22:00" />
+            <input id="manual-fare" class="admin-input" type="text" placeholder="Tarifa" value="0.35" />
+            <input id="manual-color" class="admin-input" type="text" placeholder="Color #16a085" />
+          </div>
+          <textarea id="manual-stops" class="admin-input manual-stops" rows="7" placeholder="Una parada por linea&#10;Ejemplo con nombres:&#10;Terminal Quitumbe&#10;El Recreo&#10;La Marin&#10;&#10;Ejemplo exacto:&#10;Mi parada | -0.2202 | -78.5127"></textarea>
+          <small class="hint">Si no pones lat/lon, UrbanFlow intenta ubicar la parada por nombre y ciudad.</small>
+          <button id="btn-manual-route" class="btn-primary">Guardar ruta manual</button>
+        </div>
+        <div id="import-out" class="import-result hidden"></div>
+      </div>
+
+      <!-- Tarjeta: Fuentes externas -->
+      <div class="admin-card">
+        <div class="card-header">
+          <h3>🌐 Fuentes externas</h3>
+          <button id="btn-sources" class="btn-icon" title="Refrescar">🔄</button>
+        </div>
+        <div id="sources-out" class="sources-list"></div>
+      </div>
+
+      <!-- Tarjeta: Log de actividad (ancho completo) -->
+      <div class="admin-card wide">
+        <div class="card-header">
+          <h3>📜 Log de actividad</h3>
+          <button id="btn-clear-log" class="btn-icon" title="Limpiar">🗑️</button>
+        </div>
+        <pre id="log" class="log-viewer"></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/js/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/map.js"></script>
+  <script src="/js/user.js"></script>
+  <script src="/js/admin.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

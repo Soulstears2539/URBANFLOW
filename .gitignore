@@ -1,0 +1,21 @@
+# Entorno
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Base de datos / modelos
+*.db
+*.sqlite3
+instance/
+backend/ml_model.joblib
+
+# Logs
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

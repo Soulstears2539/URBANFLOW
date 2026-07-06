@@ -1,0 +1,23 @@
+# UrbanFlow OSM - Plataforma de movilidad urbana
+# Backend modular Flask + SQLAlchemy + ML
+# Rangos flexibles para usar wheels precompilados (compatible con Python 3.12-3.14).
+
+# Web framework
+Flask>=3.0,<4
+Flask-Cors>=4.0
+Flask-SQLAlchemy>=3.1
+SQLAlchemy>=2.0
+Werkzeug>=3.0,<4
+
+# HTTP y entorno
+requests>=2.31
+python-dotenv>=1.0
+
+# Datos y Machine Learning
+pandas>=2.2.3
+numpy>=2.1
+scikit-learn>=1.5.2
+joblib>=1.4
+
+# Testing (dev)
+pytest>=8.0
